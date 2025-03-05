@@ -18,7 +18,7 @@ else
 endif
 
 .PHONY: all
-all: hello sieve itersum treesum
+all: hello sieve itersum treesum named_hello named_sieve named_itersum named_treesum
 
 .PHONY: hello
 hello: hello_asyncify.wasm hello_wasmfx.wasm hello_prompt_asyncify.wasm hello_forward_prompt_asyncify.wasm
@@ -86,9 +86,17 @@ treesum_wasmfx.wasm: inc/fiber.h src/fiber/wasmfx/imports.wat src/fiber/wasmfx/w
 	$(WASM_INTERP) -d -i src/fiber/wasmfx/imports.wat -o fiber_wasmfx_imports.wasm
 	$(WASM_MERGE) fiber_wasmfx_imports.wasm "fiber_wasmfx_imports" treesum_wasmfx.pre.wasm "main" -o treesum_wasmfx.wasm
 	chmod +x treesum_wasmfx.wasm
+
+.PHONY: named 
+named: named_hello named_sieve named_itersum named_treesum
 	
 .PHONY: named_hello
-named_hello: hello_named_wasmfx.wasm
+named_hello: hello_named_asyncify.wasm hello_named_wasmfx.wasm 
+
+hello_named_asyncify.wasm: inc/fiber_prompt.h src/fiber_prompt/asyncify/asyncify_impl.c examples/fiber_prompt/hello.c
+	$(WASICC) -DSTACK_POOL_SIZE=$(STACK_POOL_SIZE) -DASYNCIFY_DEFAULT_STACK_SIZE=$(ASYNCIFY_DEFAULT_STACK_SIZE) src/fiber_prompt/asyncify/asyncify_impl.c $(WASIFLAGS) examples/fiber_prompt/hello.c -o hello_named_asyncfiy.pre.wasm
+	$(ASYNCIFY) hello_named_asyncfiy.pre.wasm -o hello_named_asyncify.wasm
+	chmod +x hello_named_asyncify.wasm
 
 hello_named_wasmfx.wasm: inc/fiber_prompt.h src/fiber_prompt/wasmfx/imports.wat src/fiber_prompt/wasmfx/wasmfx_impl.c examples/fiber_prompt/hello.c
 	$(WASICC) $(SHADOW_STACK_FLAG) -DWASMFX_CONT_SHADOW_STACK_SIZE=$(WASMFX_CONT_SHADOW_STACK_SIZE) -DWASMFX_CONT_TABLE_INITIAL_CAPACITY=$(WASMFX_CONT_TABLE_INITIAL_CAPACITY) -Wl,--export-table,--export-memory,--export=__stack_pointer src/fiber_prompt/wasmfx/wasmfx_impl.c $(WASIFLAGS) examples/fiber_prompt/hello.c -o hello_named_wasmfx.pre.wasm
@@ -96,7 +104,48 @@ hello_named_wasmfx.wasm: inc/fiber_prompt.h src/fiber_prompt/wasmfx/imports.wat 
 	$(WASM_MERGE) fiber_prompt_wasmfx_imports.wasm "fiber_prompt_wasmfx_imports" hello_named_wasmfx.pre.wasm "main" -o hello_named_wasmfx.wasm
 	chmod +x hello_named_wasmfx.wasm
 
+.PHONY: named_itersum
+named_itersum: itersum_named_asyncify.wasm itersum_named_wasmfx.wasm
 
+itersum_named_asyncify.wasm: inc/fiber_prompt.h src/fiber_prompt/asyncify/asyncify_impl.c examples/fiber_prompt/itersum.c
+	$(WASICC) -DSTACK_POOL_SIZE=$(STACK_POOL_SIZE) -DASYNCIFY_DEFAULT_STACK_SIZE=$(ASYNCIFY_DEFAULT_STACK_SIZE) src/fiber_prompt/asyncify/asyncify_impl.c $(WASIFLAGS) examples/fiber_prompt/itersum.c -o itersum_named_asyncfiy.pre.wasm
+	$(ASYNCIFY) itersum_named_asyncfiy.pre.wasm -o itersum_named_asyncify.wasm
+	chmod +x itersum_named_asyncify.wasm
+
+itersum_named_wasmfx.wasm: inc/fiber_prompt.h src/fiber_prompt/wasmfx/imports.wat src/fiber_prompt/wasmfx/wasmfx_impl.c examples/fiber_prompt/itersum.c
+	$(WASICC) $(SHADOW_STACK_FLAG) -DWASMFX_CONT_SHADOW_STACK_SIZE=$(WASMFX_CONT_SHADOW_STACK_SIZE) -DWASMFX_CONT_TABLE_INITIAL_CAPACITY=$(WASMFX_CONT_TABLE_INITIAL_CAPACITY) -Wl,--export-table,--export-memory,--export=__stack_pointer src/fiber_prompt/wasmfx/wasmfx_impl.c $(WASIFLAGS) examples/fiber_prompt/itersum.c -o itersum_named_wasmfx.pre.wasm
+	$(WASM_INTERP) -d -i src/fiber_prompt/wasmfx/imports.wat -o fiber_prompt_wasmfx_imports.wasm
+	$(WASM_MERGE) fiber_prompt_wasmfx_imports.wasm "fiber_prompt_wasmfx_imports" itersum_named_wasmfx.pre.wasm "main" -o itersum_named_wasmfx.wasm
+	chmod +x itersum_named_wasmfx.wasm
+	
+.PHONY: named_treesum
+named_treesum: treesum_named_asyncify.wasm treesum_named_wasmfx.wasm
+
+treesum_named_asyncify.wasm: inc/fiber_prompt.h src/fiber_prompt/asyncify/asyncify_impl.c examples/fiber_prompt/treesum.c
+	$(WASICC) -DSTACK_POOL_SIZE=$(STACK_POOL_SIZE) -DASYNCIFY_DEFAULT_STACK_SIZE=$(ASYNCIFY_DEFAULT_STACK_SIZE) src/fiber_prompt/asyncify/asyncify_impl.c $(WASIFLAGS) examples/fiber_prompt/treesum.c -o treesum_named_asyncfiy.pre.wasm
+	$(ASYNCIFY) treesum_named_asyncfiy.pre.wasm -o treesum_named_asyncify.wasm
+	chmod +x treesum_named_asyncify.wasm
+
+treesum_named_wasmfx.wasm: inc/fiber_prompt.h src/fiber_prompt/wasmfx/imports.wat src/fiber_prompt/wasmfx/wasmfx_impl.c examples/fiber_prompt/treesum.c
+	$(WASICC) $(SHADOW_STACK_FLAG) -DWASMFX_CONT_SHADOW_STACK_SIZE=$(WASMFX_CONT_SHADOW_STACK_SIZE) -DWASMFX_CONT_TABLE_INITIAL_CAPACITY=$(WASMFX_CONT_TABLE_INITIAL_CAPACITY) -Wl,--export-table,--export-memory,--export=__stack_pointer src/fiber_prompt/wasmfx/wasmfx_impl.c $(WASIFLAGS) examples/fiber_prompt/treesum.c -o treesum_named_wasmfx.pre.wasm
+	$(WASM_INTERP) -d -i src/fiber_prompt/wasmfx/imports.wat -o fiber_prompt_wasmfx_imports.wasm
+	$(WASM_MERGE) fiber_prompt_wasmfx_imports.wasm "fiber_prompt_wasmfx_imports" treesum_named_wasmfx.pre.wasm "main" -o treesum_named_wasmfx.wasm
+	chmod +x treesum_named_wasmfx.wasm
+
+.PHONY: named_sieve
+named_sieve: sieve_named_asyncify.wasm sieve_named_wasmfx.wasm
+
+sieve_named_asyncify.wasm: inc/fiber_prompt.h src/fiber_prompt/asyncify/asyncify_impl.c examples/fiber_prompt/sieve.c
+	$(WASICC) -DSTACK_POOL_SIZE=$(STACK_POOL_SIZE) -DASYNCIFY_DEFAULT_STACK_SIZE=$(ASYNCIFY_DEFAULT_STACK_SIZE) src/fiber_prompt/asyncify/asyncify_impl.c $(WASIFLAGS) examples/fiber_prompt/sieve.c -o sieve_named_asyncfiy.pre.wasm
+	$(ASYNCIFY) sieve_named_asyncfiy.pre.wasm -o sieve_named_asyncify.wasm
+	chmod +x sieve_named_asyncify.wasm
+
+sieve_named_wasmfx.wasm: inc/fiber_prompt.h src/fiber_prompt/wasmfx/imports.wat src/fiber_prompt/wasmfx/wasmfx_impl.c examples/fiber_prompt/sieve.c
+	$(WASICC) $(SHADOW_STACK_FLAG) -DWASMFX_CONT_SHADOW_STACK_SIZE=$(WASMFX_CONT_SHADOW_STACK_SIZE) -DWASMFX_CONT_TABLE_INITIAL_CAPACITY=$(WASMFX_CONT_TABLE_INITIAL_CAPACITY) -Wl,--export-table,--export-memory,--export=__stack_pointer src/fiber_prompt/wasmfx/wasmfx_impl.c $(WASIFLAGS) examples/fiber_prompt/sieve.c -o sieve_named_wasmfx.pre.wasm
+	$(WASM_INTERP) -d -i src/fiber_prompt/wasmfx/imports.wat -o fiber_prompt_wasmfx_imports.wasm
+	$(WASM_MERGE) fiber_prompt_wasmfx_imports.wasm "fiber_prompt_wasmfx_imports" sieve_named_wasmfx.pre.wasm "main" -o sieve_named_wasmfx.wasm
+	chmod +x sieve_named_wasmfx.wasm
+	
 src/fiber/wasmfx/imports.wat: src/fiber/wasmfx/imports.wat.pp
 	$(WASICC) -xc $(SHADOW_STACK_FLAG) -DWASMFX_CONT_TABLE_INITIAL_CAPACITY=$(WASMFX_CONT_TABLE_INITIAL_CAPACITY) -E src/fiber/wasmfx/imports.wat.pp | sed 's/^#.*//g' > src/fiber/wasmfx/imports.wat
 	

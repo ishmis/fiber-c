@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "fiber_prompt.h"
+#include "assert.h"
 
 #define import(NAME)                                           \
   __attribute__((import_module("fiber_prompt_wasmfx_imports"), \
@@ -148,8 +149,9 @@ void* fiber_resume_with(fiber_t fiber, void* arg, fiber_result_t* result) {
 }
 
 // a prompt is provided to a fiber entry point function upon fiber_resume_with
-void* fiber_yield_to(prompt_t prompt, void* arg) {
-  return wasmfx_suspend_to(prompt, arg);
+void* fiber_yield_to(prompt_t *prompt, void* arg) {
+  assert(prompt != NULL);
+  return wasmfx_suspend_to(*prompt, arg);
 }
 
 void fiber_init(void) {

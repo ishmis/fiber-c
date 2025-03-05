@@ -12,7 +12,7 @@ void* hello(prompt_t prompt, void* arg) {
 
   while (i < strlen(s)) {
     putc(s[i], stdout);
-    i = (uint32_t)(uintptr_t)fiber_yield_to(prompt, NULL);
+    i = (uint32_t)(uintptr_t)fiber_yield_to(&prompt, NULL);
   }
 
   return NULL;
@@ -24,7 +24,7 @@ void* world(prompt_t prompt, void* arg) {
 
   while (i < strlen(s)) {
     putc(s[i], stdout);
-    i = (uint32_t)(uintptr_t)fiber_yield_to(prompt, NULL);
+    i = (uint32_t)(uintptr_t)fiber_yield_to(&prompt, NULL);
   }
 
   return NULL;
