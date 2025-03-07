@@ -152,7 +152,9 @@ __attribute__((noinline)) void fiber_free(fiber_t fiber) {
 // originally resumed the fiber.
 __attribute__((noinline)) void *fiber_yield_to(prompt_t *prompt, void *arg) {
   assert(active_fiber->state != FORWARDING);
+  printf("yielding with prompt: %i\n", *prompt);
   if (active_fiber->state == YIELDING) {
+    printf("active_prompt: %i\n", active_fiber->prompt);
     asyncify_stop_rewind();
     *prompt = active_fiber->arg.p;
     active_fiber->state = ACTIVE;
@@ -181,24 +183,27 @@ __attribute__((noinline)) void *fiber_resume_with(fiber_t fiber, void *arg,
   // volatile fiber_t child = fiber;
 
   // prev prompt
-  prompt_t curr_prompt = 0;
+  // prompt_t curr_prompt = fiber->prompt;
 
   // Set the given fiber as the actively executing fiber.
   active_fiber = fiber;
 
   // If we are resuming a suspended fiber...
   if (fiber->state == FORWARDING) {
+    printf("in forwarding, fiber_prompt: %i\n", fiber->prompt);
     fiber->arg = prev->arg;
     fiber->state = YIELDING;
     asyncify_start_rewind(&fiber->stack);
   } else if (fiber->state == YIELDING) {
     // update prompt
-    fiber->arg.p = ++global_prompt;
-    curr_prompt = fiber->arg.p;
+    fiber->arg.p = global_prompt++;
+    fiber->prompt = fiber->arg.p;
     // ... then update the argument buffer.
     fiber->arg.arg = arg;
     // ... and initiate the stack rewind.
     asyncify_start_rewind(&fiber->stack);
+  } else {
+    fiber->prompt = global_prompt++;
   }
 
   // Run the entry function.
@@ -209,16 +214,20 @@ __attribute__((noinline)) void *fiber_resume_with(fiber_t fiber, void *arg,
   asyncify_stop_unwind();
   // printf("curr_prompt = %i, arg.p = %i\n", curr_prompt, fiber->arg.p);
   // Try next enclosing handler
-  if (curr_prompt != fiber->arg.p) {
+  if (fiber->prompt != fiber->arg.p) {
     if (prev == NULL) {
+      printf("going to abort!\n");
       abort();
     }
-    //printf("going into forwarding now!\n");
+    printf("going to forward with prompt: %i, fiber_prompt is: %i, prev_prompt is: %i\n",
+           active_fiber->arg.p, fiber->prompt, prev->prompt);
+    // printf("going into forwarding now!\n");
+    prompt_t p = prev->arg.p;
+    active_fiber->state = FORWARDING;
+    fiber = active_fiber;
     prev->arg = active_fiber->arg;
     active_fiber = prev;
-    prev->state = FORWARDING;
-    active_fiber->state = YIELDING;
-    asyncify_start_unwind(&active_fiber->stack);
+    fiber_yield_to(&p, prev->arg.arg);
   }
   // Check whether the fiber finished or suspended.
   if (fiber->state != YIELDING && fiber->state != FORWARDING)
