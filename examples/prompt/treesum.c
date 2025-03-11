@@ -1,5 +1,5 @@
 // Tree traversal; a recursive variation of `itersum.c`
-#include <fiber_prompt.h>
+#include <prompt.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,17 +40,18 @@ void free_tree(node_t *node) {
   free(node);
 }
 
-void walk_tree(prompt_t *prompt, node_t *node) {
+void walk_tree(prompt_t *p, node_t *node) {
   if (node->tag == LEAF) {
-    fiber_yield_to(prompt, (void *)(intptr_t)node->val);
+    yield_result_t res = fiber_yield_to(*p, (void *)(intptr_t)node->val);
+    *p = res.prompt;
   } else {
-    walk_tree(prompt, node->left);
-    walk_tree(prompt, node->right);
+    walk_tree(p, node->left);
+    walk_tree(p, node->right);
   }
 }
 
-void *tree_walker(prompt_t prompt, void *node) {
-  walk_tree(&prompt, (node_t *)node);
+void *tree_walker(prompt_t p, void *node) {
+  walk_tree(&p, (node_t *)node);
   return NULL;
 }
 
@@ -74,22 +75,19 @@ int32_t run(node_t *tree) {
   return sum;
 }
 
+int prog(int __attribute__((unused)) argc, char **argv) {
+  int i = atoi(argv[1]);
+  node_t *tree = build_tree((int32_t)i, 0);
+  int32_t result = run(tree);
+  free_tree(tree);
+  printf("%d\n", result);
+  return 0;
+}
+
 int main(int argc, char **argv) {
   if (argc != 2) {
     fprintf(stderr, "Wrong number of arguments. Expected: 1");
     return -1;
   }
-  fiber_init();
-
-  int i = atoi(argv[1]);
-  node_t *tree = build_tree((int32_t)i, 0);
-
-  int32_t result = run(tree);
-
-  free_tree(tree);
-
-  printf("%d\n", result);
-
-  fiber_finalize();
-  return 0;
+  return fiber_main(prog, argc, argv);
 }

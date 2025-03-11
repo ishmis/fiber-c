@@ -1,8 +1,8 @@
 // An implementation of the fiber_prompt.h interface using wasmfx continuations
 #include <stdlib.h>
 
-#include "fiber_prompt.h"
 #include "assert.h"
+#include <prompt.h>
 
 #define import(NAME)                                           \
   __attribute__((import_module("fiber_prompt_wasmfx_imports"), \
@@ -149,9 +149,8 @@ void* fiber_resume_with(fiber_t fiber, void* arg, fiber_result_t* result) {
 }
 
 // a prompt is provided to a fiber entry point function upon fiber_resume_with
-void* fiber_yield_to(prompt_t *prompt, void* arg) {
-  assert(prompt != NULL);
-  return wasmfx_suspend_to(*prompt, arg);
+yield_result_t fiber_yield_to(prompt_t p, void* arg) {
+  return (yield_result_t){p, wasmfx_suspend_to(p, arg)};
 }
 
 void fiber_init(void) {
@@ -174,6 +173,13 @@ void fiber_finalize(void) {
   free(sstack_bottom_ptrs);
   free(sstack_current_ptrs);
 #endif
+}
+
+int fiber_main(int (*main)(int, char**), int argc, char** argv) {
+  fiber_init();
+  int ans = main(argc, argv);
+  fiber_finalize();
+  return ans;
 }
 
 #undef import

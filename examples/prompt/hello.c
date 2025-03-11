@@ -1,13 +1,13 @@
 // Cooperative printing of "hello world"
 #include <assert.h>
+#include <inttypes.h>
+#include <prompt.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <inttypes.h>
-#include <fiber/prompt.h>
 
-void* hello(prompt_t p, void *arg) {
+void* hello(prompt_t p, void* arg) {
   static const char s[] = "hlowrd";
   uint32_t i = (uint32_t)(uintptr_t)arg;
 
@@ -21,7 +21,7 @@ void* hello(prompt_t p, void *arg) {
   return NULL;
 }
 
-void* world(prompt_t p, void *arg) {
+void* world(prompt_t p, void* arg) {
   static const char s[] = "el ol";
   uint32_t i = (uint32_t)(uintptr_t)arg;
 
@@ -35,7 +35,8 @@ void* world(prompt_t p, void *arg) {
   return NULL;
 }
 
-int prog(int __attribute__((unused)) argc, char** __attribute__((unused)) argv) {
+int prog(int __attribute__((unused)) argc,
+         char** __attribute__((unused)) argv) {
   fiber_result_t status;
   fiber_t hello_fiber = fiber_alloc(hello);
   fiber_t world_fiber = fiber_alloc(world);
@@ -68,6 +69,4 @@ int prog(int __attribute__((unused)) argc, char** __attribute__((unused)) argv) 
   return 0;
 }
 
-int main(int argc, char** argv) {
-  return fiber_main(prog, argc, argv);
-}
+int main(int argc, char** argv) { return fiber_main(prog, argc, argv); }

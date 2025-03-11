@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fiber/prompt.h>
+#include <prompt.h>
 
 void* hello(prompt_t p, void *arg) {
   static const char s[] = "hlowrd";

@@ -1,13 +1,13 @@
 // An asyncify implementation of the basic fiber interface.
 
-#include <assert.h>
-#include <stdint.h>
-#include <stdio.h>  // TODO(ishmis): REMOVE
 #include <stdlib.h>
+#include <stdint.h>
+#include <assert.h>
 
-#include "fiber_prompt.h"
-#define import(NAME) \
-  __attribute__((import_module("asyncify"), import_name(NAME)))
+#include <wasi-io.h>
+#include <prompt.h>
+#define import(NAME) __attribute__((import_module("asyncify"),import_name(NAME)))
+
 
 /** Asyncify imports **/
 // The following functions are asyncify primitives:
@@ -17,15 +17,25 @@
 // * asyncify_start_rewind(iptr): initiates a continuation
 //   reinstatement. The argument `iptr` is a pointer to an asyncify
 //   stack.
-// * asyncfiy_stop_rewind(): delimits the extent of a continuation
+// * asyncify_stop_rewind(): delimits the extent of a continuation
 //  reinstatement.
-extern import("start_unwind") void asyncify_start_unwind(void *);
+extern
+import("start_unwind")
+void asyncify_start_unwind(void*);
 
-extern import("stop_unwind") void asyncify_stop_unwind(void);
+extern
+import("stop_unwind")
+void asyncify_stop_unwind(void);
 
-extern import("start_rewind") void asyncify_start_rewind(void *);
+extern
+import("start_rewind")
+void asyncify_start_rewind(void*);
 
-extern import("stop_rewind") void asyncify_stop_rewind(void);
+extern
+import("stop_rewind")
+void asyncify_stop_rewind(void);
+
+volatile uint32_t asyncify_state = 0;
 
 // The default stack size is 2MB.
 static const size_t default_stack_size = ASYNCIFY_DEFAULT_STACK_SIZE;
@@ -33,33 +43,28 @@ static const size_t default_stack_size = ASYNCIFY_DEFAULT_STACK_SIZE;
 // We track the currently active fiber via this global variable.
 static volatile fiber_t active_fiber = NULL;
 
-// We keep a global prompt_id for generating new ids
-static prompt_t global_prompt = 0;
+static volatile yield_result_t fiber_args = {0, NULL};
+
+// Prompt generator
+static uint32_t next_prompt = 0;
 
 // Fiber states:
 // * ACTIVE: the fiber is actively executing.
 // * YIELDING: the fiber is suspended.
-// * NAME_MISMATCH: the fiber was suspended incorrectly
 // * DONE: the fiber is finished (i.e. run to completion).
-typedef enum { ACTIVE, YIELDING, FORWARDING, DONE } fiber_state_t;
-
-struct resume_args {
-  prompt_t p;
-  void *arg;
-};
+typedef enum { ACTIVE, YIELDING, DONE, FORWARDING, YIELD_FORWARDING } fiber_state_t;
 
 // A fiber stack is an asyncify stack, i.e. a reserved area of memory
 // for asyncify to store the call chain and locals. Note: asyncify
 // assumes `end` is at offset 4. Moreover, asyncify stacks grow
 // upwards, so it must be that top <= end.
-struct __attribute__((packed)) fiber_stack {
+struct  __attribute__((packed)) fiber_stack {
   uint8_t *top;
   uint8_t *end;
   uint8_t *buffer;
 };
-static_assert(sizeof(uint8_t *) == 4, "sizeof(uint8_t*) != 4");
-static_assert(sizeof(struct fiber_stack) == 12,
-              "struct fiber_stack: No padding allowed");
+static_assert(sizeof(uint8_t*) == 4, "sizeof(uint8_t*) != 4");
+static_assert(sizeof(struct fiber_stack) == 12, "struct fiber_stack: No padding allowed");
 
 // The fiber structure embeds the asyncify stack (struct fiber_stack),
 // its state, an entry point, and two buffers for communicating
@@ -71,8 +76,8 @@ struct fiber {
   fiber_state_t state;
   // Initial function to run on the fiber.
   fiber_entry_point_t entry;
+  // Prompt
   prompt_t prompt;
-  struct resume_args arg;
 };
 
 // Allocates a fiber stack of size stack_size.
@@ -80,7 +85,7 @@ static struct fiber_stack fiber_stack_alloc(size_t stack_size) {
   uint8_t *buffer = malloc(sizeof(uint8_t) * stack_size);
   uint8_t *top = buffer;
   uint8_t *end = buffer + stack_size;
-  struct fiber_stack stack = (struct fiber_stack){top, end, /* NULL, */ buffer};
+  struct fiber_stack stack = (struct fiber_stack) { top, end, /* NULL, */ buffer };
   return stack;
 }
 
@@ -101,8 +106,7 @@ static struct fiber_stack stack_pool_next(volatile struct stack_pool *pool) {
   return pool->stacks[pool->next++];
 }
 
-static void stack_pool_reclaim(volatile struct stack_pool *pool,
-                               struct fiber_stack stack) {
+static void stack_pool_reclaim(volatile struct stack_pool *pool, struct fiber_stack stack) {
   assert(pool->next > 0 && pool->next <= STACK_POOL_SIZE);
   pool->stacks[--pool->next] = stack;
   return;
@@ -127,19 +131,19 @@ fiber_t fiber_sized_alloc(size_t stack_size, fiber_entry_point_t entry) {
   fiber->stack = fiber_stack_alloc(stack_size);
 #endif
   fiber->state = ACTIVE;
-  fiber->prompt = 0;
   fiber->entry = entry;
-  fiber->arg = (struct resume_args){0, 0};
   return fiber;
 }
 
 // Allocates a fiber object with the default stack size.
-__attribute__((noinline)) fiber_t fiber_alloc(fiber_entry_point_t entry) {
+__attribute__((noinline))
+fiber_t fiber_alloc(fiber_entry_point_t entry) {
   return fiber_sized_alloc(default_stack_size, entry);
 }
 
 // Frees a fiber object.
-__attribute__((noinline)) void fiber_free(fiber_t fiber) {
+__attribute__((noinline))
+void fiber_free(fiber_t fiber) {
 #if defined STACK_POOL_SIZE && STACK_POOL_SIZE > 0
   stack_pool_reclaim(&pool, fiber->stack);
 #else
@@ -150,27 +154,30 @@ __attribute__((noinline)) void fiber_free(fiber_t fiber) {
 
 // Yields control from within a fiber computation to whichever point
 // originally resumed the fiber.
-__attribute__((noinline)) void *fiber_yield_to(prompt_t *prompt, void *arg) {
-  assert(active_fiber->state != FORWARDING);
-  printf("yielding with prompt: %i\n", *prompt);
+__attribute__((noinline))
+yield_result_t fiber_yield_to(prompt_t p, void *arg) {
   if (active_fiber->state == YIELDING) {
-    printf("active_prompt: %i\n", active_fiber->prompt);
     asyncify_stop_rewind();
-    *prompt = active_fiber->arg.p;
+    asyncify_state = 0;
     active_fiber->state = ACTIVE;
-    return active_fiber->arg.arg;
+    return fiber_args;
   } else {
-    active_fiber->arg.arg = arg;
-    active_fiber->arg.p = *prompt;
+    fiber_args.prompt = p;
+    fiber_args.value = arg;
     active_fiber->state = YIELDING;
+    asyncify_state = 1;
     asyncify_start_unwind(&active_fiber->stack);
-    return NULL;  // dummy value; this statement never gets executed.
+    return (yield_result_t){0,0}; // dummy value; this statement never gets executed.
   }
 }
 
 // Resumes a given fiber. Control is transferred to the fiber.
-__attribute__((noinline)) void *fiber_resume_with(fiber_t fiber, void *arg,
-                                                  fiber_result_t *result) {
+__attribute__((noinline))
+void* fiber_resume_with(fiber_t fiber, void *arg, fiber_result_t *result) {
+  if (asyncify_state == 2) {
+    asyncify_stop_rewind();
+    asyncify_state = 1;
+  }
   // If we are done, signal error and return.
   if (fiber->state == DONE) {
     *result = FIBER_ERROR;
@@ -179,67 +186,62 @@ __attribute__((noinline)) void *fiber_resume_with(fiber_t fiber, void *arg,
 
   // Remember the currently executing fiber.
   volatile fiber_t prev = active_fiber;
-  // child for forwarding
-  // volatile fiber_t child = fiber;
-
-  // prev prompt
-  // prompt_t curr_prompt = fiber->prompt;
-
   // Set the given fiber as the actively executing fiber.
   active_fiber = fiber;
 
-  // If we are resuming a suspended fiber...
-  if (fiber->state == FORWARDING) {
-    printf("in forwarding, fiber_prompt: %i\n", fiber->prompt);
-    fiber->arg = prev->arg;
-    fiber->state = YIELDING;
-    asyncify_start_rewind(&fiber->stack);
-  } else if (fiber->state == YIELDING) {
-    // update prompt
-    fiber->arg.p = global_prompt++;
-    fiber->prompt = fiber->arg.p;
-    // ... then update the argument buffer.
-    fiber->arg.arg = arg;
-    // ... and initiate the stack rewind.
-    asyncify_start_rewind(&fiber->stack);
-  } else {
-    fiber->prompt = global_prompt++;
+  // If this is the first time we run the fiber, then generate a fresh
+  // prompt.
+  if (fiber->state == ACTIVE) {
+    fiber->prompt = next_prompt++;
   }
 
-  // Run the entry function.
-  // Note: the entry function must be run first both when the fiber is started
-  // and resumed!
+  // If we are resuming a suspended fiber...
+  if (fiber->state == YIELDING) {
+    // ... then update the argument buffer
+    fiber_args.value = arg;
+    // ... and generate a fresh prompt
+    fiber_args.prompt = next_prompt++;
+    fiber->prompt = fiber_args.prompt;
+    // ... and initiate the stack rewind.
+    asyncify_state = 2;
+    asyncify_start_rewind(&fiber->stack);
+  }
+
+  if (fiber->state == FORWARDING) {
+    fiber->state = ACTIVE;
+    asyncify_state = 2;
+    asyncify_start_rewind(&fiber->stack);
+  }
+
+  // Run the entry function. Note: the entry function must be run
+  // first both when the fiber is started and resumed!
   void *fiber_result = fiber->entry(fiber->prompt, arg);
-  // The following function delimits the effects of fiber_yield.
+  // The following function delimits the effects of fiber_yield_to.
   asyncify_stop_unwind();
-  // printf("curr_prompt = %i, arg.p = %i\n", curr_prompt, fiber->arg.p);
-  // Try next enclosing handler
-  if (fiber->prompt != fiber->arg.p) {
+  asyncify_state = 0;
+
+  if (fiber->state == YIELDING && fiber->prompt != fiber_args.prompt) {
     if (prev == NULL) {
-      printf("going to abort!\n");
+      wasi_print("unhandled prompt");
       abort();
     }
-    printf("going to forward with prompt: %i, fiber_prompt is: %i, prev_prompt is: %i\n",
-           active_fiber->arg.p, fiber->prompt, prev->prompt);
-    // printf("going into forwarding now!\n");
-    prompt_t p = prev->arg.p;
-    active_fiber->state = FORWARDING;
-    fiber = active_fiber;
-    prev->arg = active_fiber->arg;
     active_fiber = prev;
-    fiber_yield_to(&p, prev->arg.arg);
+    active_fiber->state = FORWARDING;
+    *result = FIBER_FORWARD;
+    asyncify_start_unwind(&active_fiber->stack);
+    return NULL;
   }
+
   // Check whether the fiber finished or suspended.
   if (fiber->state != YIELDING && fiber->state != FORWARDING)
     fiber->state = DONE;
 
   // Restore the previously executing fiber.
   active_fiber = prev;
-  assert(fiber->state != FORWARDING);
   // Signal success.
-  if (fiber->state == YIELDING) {
+  if (fiber->state == YIELDING || fiber->state == FORWARDING) {
     *result = FIBER_YIELD;
-    return fiber->arg.arg;
+    return fiber_args.value;
   } else {
     *result = FIBER_OK;
     return fiber_result;
@@ -266,6 +268,13 @@ void fiber_finalize(void) {
   }
   assert(pool.next == STACK_POOL_SIZE);
 #endif
+}
+
+int fiber_main(int (*main)(int, char**), int argc, char** argv) {
+  fiber_init();
+  int ans = main(argc, argv);
+  fiber_finalize();
+  return ans;
 }
 
 #undef import

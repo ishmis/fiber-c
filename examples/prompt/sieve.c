@@ -2,8 +2,8 @@
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
-#include <fiber_prompt.h>
 #include <inttypes.h>
+#include <prompt.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -12,13 +12,16 @@
 
 #define MAX_PRIMES_LIMIT 203280220
 
-static bool filter(prompt_t prompt, int32_t my_prime) {
+static bool filter(prompt_t p, int32_t my_prime) {
   bool divisible = false;
-  int32_t candidate = (int32_t)(intptr_t)fiber_yield_to(&prompt, NULL);
+  yield_result_t res = fiber_yield_to(p, NULL);
+  p = res.prompt;
+  int32_t candidate = (int32_t)(intptr_t)res.value;
   while (candidate > 0) {
     divisible = (candidate % my_prime) == 0;
-    candidate =
-        (int32_t)(intptr_t)fiber_yield_to(&prompt, (void *)(intptr_t)divisible);
+    res = fiber_yield_to(p, (void *)(intptr_t)divisible);
+    p = res.prompt;
+    candidate = (int32_t)(intptr_t)res.value;
   }
   return false;
 }
@@ -37,12 +40,7 @@ static void print_input_error_and_exit(void) {
   exit(1);
 }
 
-int main(int argc, char **argv) {
-  if (argc != 2) {
-    printf("usage: %s <n>\n", argv[0]);
-    exit(1);
-  }
-
+int prog(int __attribute__((unused)) argc, char **argv) {
   if (!sanitise_input_number(argv[1])) {
     print_input_error_and_exit();
   }
@@ -58,7 +56,6 @@ int main(int argc, char **argv) {
   uint32_t p = 0;        // number of primes computed so far.
   int32_t i = 2;         // the current candidate prime number.
 
-  fiber_init();
   fiber_t *filters = (fiber_t *)malloc(sizeof(fiber_t) * max_primes);
   fiber_result_t status;
 
@@ -97,7 +94,14 @@ int main(int argc, char **argv) {
     fiber_free(filters[i]);
   }
   free(filters);
-  fiber_finalize();
 
   return 0;
+}
+
+int main(int argc, char **argv) {
+  if (argc != 2) {
+    printf("usage: %s <n>\n", argv[0]);
+    exit(1);
+  }
+  return fiber_main(prog, argc, argv);
 }
