@@ -17,7 +17,7 @@ static bool filter(int32_t my_prime) {
   int32_t candidate = (int32_t)(intptr_t)fiber_yield(NULL);
   while (candidate > 0) {
     divisible = (candidate % my_prime) == 0;
-    candidate = (int32_t)(intptr_t)fiber_yield((void*)(intptr_t)divisible);
+    candidate = (int32_t)(intptr_t)fiber_yield((void *)(intptr_t)divisible);
   }
   return false;
 }
@@ -30,7 +30,9 @@ static bool sanitise_input_number(const char *s) {
 }
 
 static void print_input_error_and_exit(void) {
-  fprintf(stderr, "error: input must be a positive integer in the interval [1, %d]\n", MAX_PRIMES_LIMIT);
+  fprintf(stderr,
+          "error: input must be a positive integer in the interval [1, %d]\n",
+          MAX_PRIMES_LIMIT);
   exit(1);
 }
 
@@ -46,25 +48,28 @@ int prog(int argc, char **argv) {
 
   errno = 0;
   long int result = strtol(argv[1], NULL, 10 /* base 10 */);
-  if (result <= 0 && (errno == ERANGE || errno == EINVAL || result > MAX_PRIMES_LIMIT)) {
+  if (result <= 0 &&
+      (errno == ERANGE || errno == EINVAL || result > MAX_PRIMES_LIMIT)) {
     print_input_error_and_exit();
   }
-  uint32_t max_primes = (uint32_t)result; // maximum number of primes to compute.
-  uint32_t p = 0;                         // number of primes computed so far.
-  int32_t i = 2;                          // the current candidate prime number.
+  uint32_t max_primes =
+      (uint32_t)result;  // maximum number of primes to compute.
+  uint32_t p = 0;        // number of primes computed so far.
+  int32_t i = 2;         // the current candidate prime number.
 
-  fiber_t *filters = (fiber_t*)malloc(sizeof(fiber_t) * max_primes);
+  fiber_t *filters = (fiber_t *)malloc(sizeof(fiber_t) * max_primes);
   fiber_result_t status;
 
   while (p < max_primes) {
     bool divisible = false;
     for (uint32_t j = 0; j < p; j++) {
-      divisible = (bool)(intptr_t)fiber_resume(filters[j], (void*)(intptr_t)i, &status);
+      divisible = (bool)(intptr_t)fiber_resume(filters[j], (void *)(intptr_t)i,
+                                               &status);
       assert(status == FIBER_YIELD);
       if (divisible) break;
     }
     if (!divisible) {
-      char sbuf[11]; // 10 digits + null character.
+      char sbuf[11];  // 10 digits + null character.
       int32_t len = snprintf(sbuf, sizeof(sbuf), "%" PRId32 " ", i);
       if (len < 1) {
         fprintf(stderr, "error: failed to convert int32_t to a string\n");
@@ -73,8 +78,8 @@ int prog(int argc, char **argv) {
       for (int32_t i = 0; i < len; i++) {
         putc(sbuf[i], stdout);
       }
-      fiber_t filter_fiber = fiber_alloc((fiber_entry_point_t)(void*)filter);
-      (void)fiber_resume(filter_fiber, (void*)(intptr_t)i, &status);
+      fiber_t filter_fiber = fiber_alloc((fiber_entry_point_t)(void *)filter);
+      (void)fiber_resume(filter_fiber, (void *)(intptr_t)i, &status);
       assert(status == FIBER_YIELD);
       filters[p++] = filter_fiber;
     }
@@ -85,7 +90,7 @@ int prog(int argc, char **argv) {
   assert(p == max_primes);
   // Clean up
   for (uint32_t i = 0; i < p; i++) {
-    (void)fiber_resume(filters[i], (void*)(intptr_t)0, &status);
+    (void)fiber_resume(filters[i], (void *)(intptr_t)0, &status);
     assert(status == FIBER_OK);
     fiber_free(filters[i]);
   }
@@ -94,6 +99,4 @@ int prog(int argc, char **argv) {
   return 0;
 }
 
-int main(int argc, char** argv) {
-  return fiber_main(prog, argc, argv);
-}
+int main(int argc, char **argv) { return fiber_main(prog, argc, argv); }

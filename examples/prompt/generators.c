@@ -9,7 +9,8 @@
 static prompt_t top_prompt;
 
 void gen_nats(void) {
-  for (int i = 0; i < 10; ++i) {
+  // currently, asyncify_prompt gets stuck with the first arg only
+  for (int i = 5; i < 7; ++i) {
     yield_result_t res = fiber_yield_to(top_prompt, (void*)(intptr_t)i);
     top_prompt = res.prompt;
   }
@@ -52,6 +53,7 @@ int prog(int __attribute__((unused)) argc,
   void* ans = fiber_resume_with(sum_fiber, (void*)(intptr_t)(0), &status);
   while (status == FIBER_YIELD) {
     sum += (int)(intptr_t)ans;
+    printf("sum currently is %i\n", sum);
     ans = fiber_resume_with(sum_fiber, NULL, &status);
   }
   assert(status == FIBER_OK);
