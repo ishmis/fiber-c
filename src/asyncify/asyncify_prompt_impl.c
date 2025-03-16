@@ -153,6 +153,13 @@ __attribute__((noinline)) yield_result_t fiber_yield_to(prompt_t p, void *arg) {
     if (active_fiber->prompt == 3) {
       wasi_print("rewound to fiber->prompt == 3\n");
     }
+    if (active_fiber->prompt == 5) {
+      wasi_print("rewound to fiber->prompt == 5\n");
+    }
+    if (active_fiber->prompt == 7) {
+      wasi_print("rewound to fiber->prompt == 7\n");
+    }
+    orig_fiber = NULL;
     active_fiber->state = YIELDING;
   }
   if (active_fiber->state == YIELDING) {

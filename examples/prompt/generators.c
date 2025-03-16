@@ -10,7 +10,7 @@ static prompt_t top_prompt;
 
 void gen_nats(void) {
   // currently, asyncify_prompt gets stuck with the first arg only
-  for (int i = 5; i < 7; ++i) {
+  for (int i = 0; i < 10; ++i) {
     yield_result_t res = fiber_yield_to(top_prompt, (void*)(intptr_t)i);
     top_prompt = res.prompt;
   }
