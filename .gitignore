@@ -56,4 +56,7 @@ dkms.conf
 \#*
 
 # Ignore generated files
-src/wasmfx/imports.wat
+src/*/imports.wat
+*.cwasm
+.vscode
+benchmarking.sh 
