@@ -77,7 +77,7 @@ treesum_wasmfx.wasm: inc/fiber.h src/wasmfx/imports.wat src/wasmfx/wasmfx_impl.c
 	chmod +x treesum_wasmfx.wasm
 
 .PHONY: prompt 
-prompt: prompt_hello prompt_sieve prompt_itersum prompt_treesum prompt_generators
+prompt: prompt_hello prompt_sieve prompt_itersum prompt_treesum prompt_generators prompt_parity
 	
 .PHONY: prompt_hello
 prompt_hello: hello_prompt_asyncify.wasm hello_prompt_wasmfx.wasm hello_forward_prompt_asyncify.wasm hello_forward_prompt_wasmfx.wasm
@@ -159,7 +159,21 @@ generators_prompt_wasmfx.wasm: inc/prompt.h src/wasmfx/imports_prompt.wat src/wa
 	$(WASM_INTERP) -d -i src/wasmfx/imports_prompt.wat -o fiber_prompt_wasmfx_imports.wasm
 	$(WASM_MERGE) fiber_prompt_wasmfx_imports.wasm "fiber_prompt_wasmfx_imports" generators_prompt_wasmfx.pre.wasm "main" -o generators_prompt_wasmfx.wasm
 	chmod +x generators_prompt_wasmfx.wasm
-	
+
+.PHONY: prompt_parity
+prompt_parity: parity_prompt_asyncify.wasm parity_prompt_wasmfx.wasm
+
+parity_prompt_asyncify.wasm: inc/prompt.h src/asyncify/asyncify_prompt_impl.c examples/prompt/parity.c
+	$(WASICC) -DSTACK_POOL_SIZE=$(STACK_POOL_SIZE) -DASYNCIFY_DEFAULT_STACK_SIZE=$(ASYNCIFY_DEFAULT_STACK_SIZE) src/asyncify/asyncify_prompt_impl.c $(WASIFLAGS) examples/prompt/parity.c -o parity_prompt_asyncfiy.pre.wasm
+	$(ASYNCIFY) parity_prompt_asyncfiy.pre.wasm -o parity_prompt_asyncify.wasm
+	chmod +x parity_prompt_asyncify.wasm
+
+parity_prompt_wasmfx.wasm: inc/prompt.h src/wasmfx/imports_prompt.wat src/wasmfx/wasmfx_prompt_impl.c examples/prompt/parity.c
+	$(WASICC) $(SHADOW_STACK_FLAG) -DWASMFX_CONT_SHADOW_STACK_SIZE=$(WASMFX_CONT_SHADOW_STACK_SIZE) -DWASMFX_CONT_TABLE_INITIAL_CAPACITY=$(WASMFX_CONT_TABLE_INITIAL_CAPACITY) -Wl,--export-table,--export-memory,--export=__stack_pointer src/wasmfx/wasmfx_prompt_impl.c $(WASIFLAGS) examples/prompt/parity.c -o parity_prompt_wasmfx.pre.wasm
+	$(WASM_INTERP) -d -i src/wasmfx/imports_prompt.wat -o fiber_prompt_wasmfx_imports.wasm
+	$(WASM_MERGE) fiber_prompt_wasmfx_imports.wasm "fiber_prompt_wasmfx_imports" parity_prompt_wasmfx.pre.wasm "main" -o parity_prompt_wasmfx.wasm
+	chmod +x parity_prompt_wasmfx.wasm
+		
 src/wasmfx/imports_prompt.wat: src/wasmfx/imports_prompt.wat.pp
 	$(WASICC) -xc $(SHADOW_STACK_FLAG) -DWASMFX_CONT_TABLE_INITIAL_CAPACITY=$(WASMFX_CONT_TABLE_INITIAL_CAPACITY) -E src/wasmfx/imports_prompt.wat.pp | sed 's/^#.*//g' > src/wasmfx/imports_prompt.wat
 	
