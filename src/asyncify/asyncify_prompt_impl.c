@@ -150,44 +150,18 @@ __attribute__((noinline)) void fiber_free(fiber_t fiber) {
 __attribute__((noinline)) yield_result_t fiber_yield_to(prompt_t p, void *arg) {
   if (asyncify_state == 2) {
     asyncify_stop_rewind();
-    if (active_fiber->prompt == 3) {
-      wasi_print("rewound to fiber->prompt == 3\n");
-    }
-    if (active_fiber->prompt == 5) {
-      wasi_print("rewound to fiber->prompt == 5\n");
-    }
-    if (active_fiber->prompt == 7) {
-      wasi_print("rewound to fiber->prompt == 7\n");
-    }
-    orig_fiber = NULL;
+    orig_fiber = NULL;  // reset original fiber
     active_fiber->state = YIELDING;
   }
   if (active_fiber->state == YIELDING) {
     if (asyncify_state != 2) {
       asyncify_stop_rewind();
     }
-    if (asyncify_state == 0) {
-      wasi_print("async_state == 0 in fiber_yield_to yielding\n");
-    }
-    if (asyncify_state == 1) {
-      wasi_print("async_state == 1 in fiber_yield_to yielding\n");
-    }
-    if (asyncify_state == 2) {
-      wasi_print("async_state == 2 in fiber_yield_to yielding\n");
-    }
+    // asyncify_state here can be 2
     asyncify_state = 0;
     active_fiber->state = ACTIVE;
     return fiber_args;
   } else {
-    if (asyncify_state == 0) {
-      wasi_print("async_state == 0 in fiber_yield_to non yielding\n");
-    }
-    if (asyncify_state == 1) {
-      wasi_print("async_state == 1 in fiber_yield_to non yielding\n");
-    }
-    if (asyncify_state == 2) {
-      wasi_print("async_state == 2 in fiber_yield_to non yielding\n");
-    }
     fiber_args.prompt = p;
     fiber_args.value = arg;
     active_fiber->state = YIELDING;
@@ -252,7 +226,7 @@ __attribute__((noinline)) void *fiber_resume_with(fiber_t fiber, void *arg,
       wasi_print("unhandled prompt");
       abort();
     }
-    // need to clear this somehow
+    // cleared in fiber_suspend_to
     if (orig_fiber == NULL) {
       orig_fiber = fiber;
     }
