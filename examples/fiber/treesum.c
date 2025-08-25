@@ -1,8 +1,9 @@
 // Tree traversal; a recursive variation of `itersum.c`
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
+// ./treesum n should yield the value n * 2^n
 #include <fiber.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 typedef struct node {
   enum { LEAF, FORK } tag;
@@ -17,8 +18,8 @@ typedef struct node {
   };
 } node_t;
 
-node_t* build_tree(int32_t depth, int32_t val) {
-  node_t *node = (node_t*)malloc(sizeof(node_t));
+node_t *build_tree(int32_t depth, int32_t val) {
+  node_t *node = (node_t *)malloc(sizeof(node_t));
   if (depth == 0) {
     node->tag = LEAF;
     node->val = val;
@@ -42,24 +43,24 @@ void free_tree(node_t *node) {
 
 void walk_tree(node_t *node) {
   if (node->tag == LEAF) {
-    fiber_yield((void*)(intptr_t)node->val);
+    fiber_yield((void *)(intptr_t)node->val);
   } else {
     walk_tree(node->left);
     walk_tree(node->right);
   }
 }
 
-void* tree_walker(void *node) {
-  walk_tree((node_t*)node);
+void *tree_walker(void *node) {
+  walk_tree((node_t *)node);
   return NULL;
 }
 
-int32_t run(node_t* tree) {
+int32_t run(node_t *tree) {
   fiber_result_t status;
   int32_t sum = 0;
   fiber_t walker = fiber_alloc(tree_walker);
 
-  void* val = fiber_resume(walker, (void*)tree, &status);
+  void *val = fiber_resume(walker, (void *)tree, &status);
 
   while (status == FIBER_YIELD) {
     sum += (int32_t)(intptr_t)val;
@@ -70,7 +71,7 @@ int32_t run(node_t* tree) {
   return sum;
 }
 
-int prog(int argc, char** argv) {
+int prog(int argc, char **argv) {
   if (argc != 2) {
     fprintf(stderr, "Wrong number of arguments. Expected: 1");
     return -1;
@@ -88,6 +89,4 @@ int prog(int argc, char** argv) {
   return 0;
 }
 
-int main(int argc, char** argv) {
-  return fiber_main(prog, argc, argv);
-}
+int main(int argc, char **argv) { return fiber_main(prog, argc, argv); }

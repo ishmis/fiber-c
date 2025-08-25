@@ -1,13 +1,13 @@
 ASYNCIFY_DEFAULT_STACK_SIZE?=2097152
 STACK_POOL_SIZE?=0
-WASMFX_CONT_TABLE_INITIAL_CAPACITY?=1024
+WASMFX_CONT_TABLE_INITIAL_CAPACITY?=1
 WASMFX_PRESERVE_SHADOW_STACK?=1
 # Only relevant if WASMFX_PRESERVE_SHADOW_STACK is 1
 WASMFX_CONT_SHADOW_STACK_SIZE?=65536
 # Ensure these are set correctly for your system 
 ASYNCIFY=../binaryenfx/bin/wasm-opt --enable-exception-handling --enable-reference-types --enable-multivalue --enable-bulk-memory --enable-gc --enable-stack-switching -O2 --asyncify
-WASICC=../wasi-sdk-25.0/bin/clang
-WASIFLAGS=--sysroot=../wasi-sdk-25.0/share/wasi-sysroot -std=c17 -Wall -Wextra -Werror -Wpedantic -Wno-strict-prototypes -O3 -I inc
+WASICC=/opt/wasi-sdk/bin/clang
+WASIFLAGS=--sysroot=/opt/wasi-sdk/share/wasi-sysroot -std=c17 -Wall -Wextra -Werror -Wpedantic -Wno-strict-prototypes -O3 -I inc
 WASM_INTERP=../specfx/interpreter/wasm
 WASM_MERGE=../binaryenfx/bin/wasm-merge --enable-multimemory --enable-exception-handling --enable-reference-types --enable-multivalue --enable-bulk-memory --enable-gc --enable-stack-switching
 
@@ -183,5 +183,6 @@ src/wasmfx/imports.wat: src/wasmfx/imports.wat.pp
 .PHONY: clean
 clean:
 	rm -f *.wasm
+	rm -f *.cwasm
 	rm -f src/wasmfx/imports.wat
 	rm -f src/wasmfx/imports_prompt.wat

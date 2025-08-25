@@ -34,8 +34,6 @@ static const size_t default_stack_size = ASYNCIFY_DEFAULT_STACK_SIZE;
 // We track the currently active fiber via this global variable.
 static volatile fiber_t active_fiber = NULL;
 
-static volatile fiber_t orig_fiber = NULL;
-
 static volatile yield_result_t fiber_args = {0, NULL};
 
 // Prompt generator
@@ -148,16 +146,8 @@ __attribute__((noinline)) void fiber_free(fiber_t fiber) {
 // Yields control from within a fiber computation to whichever point
 // originally resumed the fiber.
 __attribute__((noinline)) yield_result_t fiber_yield_to(prompt_t p, void *arg) {
-  if (asyncify_state == 2) {
-    asyncify_stop_rewind();
-    orig_fiber = NULL;  // reset original fiber
-    active_fiber->state = YIELDING;
-  }
   if (active_fiber->state == YIELDING) {
-    if (asyncify_state != 2) {
-      asyncify_stop_rewind();
-    }
-    // asyncify_state here can be 2
+    asyncify_stop_rewind();
     asyncify_state = 0;
     active_fiber->state = ACTIVE;
     return fiber_args;
@@ -175,6 +165,10 @@ __attribute__((noinline)) yield_result_t fiber_yield_to(prompt_t p, void *arg) {
 // Resumes a given fiber. Control is transferred to the fiber.
 __attribute__((noinline)) void *fiber_resume_with(fiber_t fiber, void *arg,
                                                   fiber_result_t *result) {
+  if (asyncify_state == 2) {
+    asyncify_stop_rewind();
+    asyncify_state = 1;
+  }
   // If we are done, signal error and return.
   if (fiber->state == DONE) {
     *result = FIBER_ERROR;
@@ -207,11 +201,7 @@ __attribute__((noinline)) void *fiber_resume_with(fiber_t fiber, void *arg,
   if (fiber->state == FORWARDING) {
     fiber->state = ACTIVE;
     asyncify_state = 2;
-    // ... then update the argument buffer
-    fiber_args.value = arg;
-    // ... and generate a fresh prompt
-    fiber_args.prompt = next_prompt++;
-    asyncify_start_rewind(&orig_fiber->stack);
+    asyncify_start_rewind(&fiber->stack);
   }
 
   // Run the entry function. Note: the entry function must be run
@@ -225,10 +215,6 @@ __attribute__((noinline)) void *fiber_resume_with(fiber_t fiber, void *arg,
     if (prev == NULL) {
       wasi_print("unhandled prompt");
       abort();
-    }
-    // cleared in fiber_suspend_to
-    if (orig_fiber == NULL) {
-      orig_fiber = fiber;
     }
     active_fiber = prev;
     active_fiber->state = FORWARDING;

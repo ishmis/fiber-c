@@ -59,4 +59,7 @@ dkms.conf
 src/*/imports.wat
 *.cwasm
 .vscode
-benchmarking.sh 
+
+# Runtime Binaries
+wtime 
+wtimepool
