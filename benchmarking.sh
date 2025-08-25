@@ -8,40 +8,40 @@ make all -j
 
 # Tooling paths
 HYPERFINE_HIST_PLOT_PATH="../hyperfine/scripts/plot_histogram.py"
-RELEASE_WASMTIME_PATH="../wasmfxtime/target/release/wasmtime"
+RELEASE_WASMTIME_PATH="./wtime" # input path to wasmfxtime executable 
 RELEASE_WASMTIME_COMPILE="$RELEASE_WASMTIME_PATH compile -W=exceptions,function-references,stack-switching"
 
 # Bench + Plotting params
 
 # Named v. Unnamed WasmFX
 NAMED_UNNAMED_ITERSUM_INPUT=2000
-NAMED_UNNAMED_ASYNCIFY_CMPR_ITERSUM_RUNS=100
-NAMED_UNNAMED_ASYNCIFY_CMPR_ITERSUM_TMIN=0.004
-NAMED_UNNAMED_ASYNCIFY_CMPR_ITERSUM_TMAX=0.008
+NAMED_UNNAMED_ITERSUM_RUNS=50
+NAMED_UNNAMED_ITERSUM_TMIN=0.004
+NAMED_UNNAMED_ITERSUM_TMAX=0.008
 
 NAMED_UNNAMED_TREESUM_INPUT=25
-NAMED_UNNAMED_TREESUM_RUNS=1
+NAMED_UNNAMED_TREESUM_RUNS=50
 NAMED_UNNAMED_TREESUM_TMIN=1.0
 NAMED_UNNAMED_TREESUM_TMAX=6.0
 
 NAMED_UNNAMED_SIEVE_INPUT=100
-NAMED_UNNAMED_SIEVE_RUNS=100
+NAMED_UNNAMED_SIEVE_RUNS=50
 NAMED_UNNAMED_SIEVE_TMIN=0.004
 NAMED_UNNAMED_SIEVE_TMAX=0.01
 
 # Named Asyc v. WasmFX
 ASYNCIFY_CMPR_ITERSUM_INPUT=2000
-ASYNCIFY_CMPR_ITERSUM_RUNS=100
+ASYNCIFY_CMPR_ITERSUM_RUNS=50
 ASYNCIFY_CMPR_ITERSUM_TMIN=0.004
 ASYNCIFY_CMPR_ITERSUM_TMAX=0.008
 
 ASYNCIFY_CMPR_TREESUM_INPUT=25
-ASYNCIFY_CMPR_TREESUM_RUNS=1
+ASYNCIFY_CMPR_TREESUM_RUNS=50
 ASYNCIFY_CMPR_TREESUM_TMIN=1.0
 ASYNCIFY_CMPR_TREESUM_TMAX=6.0
 
 ASYNCIFY_CMPR_SIEVE_INPUT=100
-ASYNCIFY_CMPR_SIEVE_RUNS=100
+ASYNCIFY_CMPR_SIEVE_RUNS=50
 ASYNCIFY_CMPR_SIEVE_TMIN=0.004
 ASYNCIFY_CMPR_SIEVE_TMAX=0.01
 
@@ -97,22 +97,22 @@ wtimec "sieve_prompt_wasmfx.wasm"
 # clear all wasm files
 rm *.wasm
 
-### Benchmark pre-compiled
+## Benchmark pre-compiled
 
 bench_named_unnamed() {
     hyperfine -w 20 -r $6 \
-        "../wasmfxtime/target/release/wasmtime -W=exceptions,function-references,stack-switching --allow-precompiled $1_wasmfx.cwasm $2" \
-        "../wasmfxtime/target/release/wasmtime -W=exceptions,function-references,stack-switching --allow-precompiled $1_prompt_wasmfx.cwasm $2" \
-        --export-json $1_named_unnamed.json
+        "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled $1_wasmfx.cwasm $2" \
+        "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled $1_prompt_wasmfx.cwasm $2"
+        # --export-json $1_named_unnamed.json
 
-    python3.11 $HYPERFINE_HIST_PLOT_PATH \
-        --title="$3" \
-        --type="bar" \
-        --legend="upper right" \
-        --labels="unnamed,named" \
-        --t-min=$4 \
-        --t-max=$5 \
-        $1_named_unnamed.json
+    # python3.11 $HYPERFINE_HIST_PLOT_PATH \
+    #     --title="$3" \
+    #     --type="bar" \
+    #     --legend="upper right" \
+    #     --labels="unnamed,named" \
+    #     --t-min=$4 \
+    #     --t-max=$5 \
+    #     $1_named_unnamed.json
 }
 
 ## Named WasmFX v. Unnamed WasmFX
@@ -146,18 +146,19 @@ bench_named_unnamed "sieve" \
 
 bench_prompt_wasmfx_asyncify() {
     hyperfine -w 20 -r $6 \
-        "../wasmfxtime/target/release/wasmtime -W=exceptions,function-references,stack-switching --allow-precompiled $1_prompt_asyncify.cwasm $2" \
-        "../wasmfxtime/target/release/wasmtime -W=exceptions,function-references,stack-switching --allow-precompiled $1_prompt_wasmfx.cwasm $2" \
-        --export-json $1_prompt_asyncify_wasmfx.json
-
-    python3.11 $HYPERFINE_HIST_PLOT_PATH \
-        --title="$3" \
-        --type="bar" \
-        --legend="upper right" \
-        --labels="asyncify,wasmfx" \
-        --t-min=$4 \
-        --t-max=$5 \
-        $1_prompt_asyncify_wasmfx.json
+        "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled $1_prompt_asyncify.cwasm $2" \
+        "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled $1_prompt_wasmfx.cwasm $2" 
+       
+        # --export-json $1_prompt_asyncify_wasmfx.json
+    # uncomment to plot
+    # python3.11 $HYPERFINE_HIST_PLOT_PATH \
+    #     --title="$3" \
+    #     --type="bar" \
+    #     --legend="upper right" \
+    #     --labels="asyncify,wasmfx" \
+    #     --t-min=$4 \
+    #     --t-max=$5 \
+    #     $1_prompt_asyncify_wasmfx.json
 }
 
 ## Named WasmFX v. Asyncify
@@ -196,3 +197,16 @@ fi
 
 # clear all precompiled files
 rm *.cwasm
+
+
+# Itersum 
+hyperfine -w 50 -r 100 "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled itersum_wasmfx.cwasm 2000" "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled itersum_prompt_wasmfx.cwasm 2000" "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled itersum_asyncify.cwasm 2000" "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled itersum_prompt_asyncify.cwasm 2000"
+
+# # Treesum
+hyperfine -w 50 -r 100 "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled treesum_wasmfx.cwasm 25" "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled treesum_prompt_wasmfx.cwasm 25" "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled treesum_asyncify.cwasm 25" "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled treesum_prompt_asyncify.cwasm 25"
+
+# Sieve
+hyperfine -w 50 -r 100 "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled sieve_wasmfx.cwasm 10000" "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled sieve_prompt_wasmfx.cwasm 10000" "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled sieve_asyncify.cwasm 10000" "./wtime -W=exceptions,function-references,stack-switching --allow-precompiled sieve_prompt_asyncify.cwasm 10000"
+
+# Sieve pooling
+hyperfine -w 50 -r 100 "./wtimepool -W=exceptions,function-references,stack-switching --allow-precompiled sieve_wasmfx.cwasm 10000" "./wtimepool -W=exceptions,function-references,stack-switching --allow-precompiled sieve_prompt_wasmfx.cwasm 10000" "./wtimepool -W=exceptions,function-references,stack-switching --allow-precompiled sieve_asyncify.cwasm 10000" "./wtimepool -W=exceptions,function-references,stack-switching --allow-precompiled sieve_prompt_asyncify.cwasm 10000"
