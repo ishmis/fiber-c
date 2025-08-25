@@ -1,11 +1,10 @@
 // Iterative sum; an iterative variation of `treesum.c`
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <fiber.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-
-void* sum(void *arg) {
+void* sum(void* arg) {
   int32_t max = 0;
   max = (int32_t)(intptr_t)arg;
   for (int32_t i = 0; i < max; i++) {
@@ -45,6 +44,4 @@ int prog(int argc, char** argv) {
   return 0;
 }
 
-int main(int argc, char** argv) {
-  return (int)fiber_main(prog, argc, argv);
-}
+int main(int argc, char** argv) { return (int)fiber_main(prog, argc, argv); }

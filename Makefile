@@ -169,5 +169,6 @@ src/wasmfx/imports.wat: src/wasmfx/imports.wat.pp
 .PHONY: clean
 clean:
 	rm -f *.wasm
+	rm -f *.cwasm
 	rm -f src/wasmfx/imports.wat
 	rm -f src/wasmfx/imports_prompt.wat
